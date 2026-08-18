@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("train")
 
-ARTIFACT_PATH = Path(__file__).resolve().parent.parent / "artifacts" / "model.joblib"
+ARTIFACT_PATH = Path(__file__).resolve().parent.parent / "artifacts" / "diabetes_model.joblib"
 
 
 def load_data():
@@ -71,6 +71,7 @@ def save_artifact(model, feature_names, metrics):
 
 
 def main():
+    """ Calls the training algorithm functions toload data,  train and save model """
     X, y, feature_names = load_data()
     model, metrics = train_model(X, y)
     save_artifact(model, feature_names, metrics)
