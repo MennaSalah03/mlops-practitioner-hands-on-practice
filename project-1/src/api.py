@@ -3,12 +3,13 @@
 from litestar import Litestar, post, get
 from litestar.di import Provide
 from pydantic import BaseModel
+import structlog
+import logging
 
-# Import the OOP classes you built in your src/ directory
+from src.logger import configure_logging
 from src.model import DiabetesSklearnModel
 from src.cache import RedisCacheManager
 from src.service import InferenceService
-
 
 # ── 1. Schema (The Web Boundary) ─────────────────────
 class PredictRequest(BaseModel):
@@ -25,11 +26,13 @@ class PredictRequest(BaseModel):
         return [self.age, self.sex, self.bmi, self.bp, self.s1, self.s2]
 
 
+configure_logging()
+logger = structlog.get_logger().bind(component="api")
+
 class PredictResponse(BaseModel):
     """ predict response """
     prediction: float
     status: str = "ok"
-
 
 # ── 2. Dependency Factory (Composition in Action) ────
 def get_inference_service() -> InferenceService:
@@ -38,10 +41,10 @@ def get_inference_service() -> InferenceService:
     It builds the pieces and wires them together.
     """
     # 1. Build the math engine
-    # (Ensure you have a dummy model saved here, or adjust the path)
+    logger.info("initializing_dependencies")
     predictor = DiabetesSklearnModel(model_path="models/diabetes_model.joblib")
 
-    # 2. Build the cache memory 
+    # 2. Build the cache memory
     # (Using "localhost" for local dev, will change to "redis" in Docker)
     cache = RedisCacheManager(host="localhost", port=6379)
 
@@ -56,11 +59,14 @@ async def predict(
     service: InferenceService,  # Litestar injects the composed service here
 ) -> PredictResponse:
     """ prediction posted to the API """
+    logger.info("prediction_request_received")
     # 1. Strip the JSON labels to get the raw numbers
     ordered_features = data.to_list()
 
     # 2. Ask the service (which handles both Redis and the ML model)
     result = service.get_prediction(ordered_features)
+
+    logger.info("prediction_request_successful", result=result)
 
     # 3. Return the formatted response
     return PredictResponse(prediction=result)
