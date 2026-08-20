@@ -1,2 +1,5 @@
+/src/mlops_course_mini_projects/
 src/__pycache__/*
 .venv/
+data/
+models/*.pkl
