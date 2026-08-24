@@ -1,5 +1,5 @@
 /src/mlops_course_mini_projects/
-src/__pycache__/*
+__pycache__/
 .venv/
 data/
 .env

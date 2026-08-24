@@ -11,39 +11,31 @@ from prodml.api.schemas import (
     PredictRequest,
     PredictResponse,
 )
-from prodml.cache import RedisCacheManager
 from prodml.config import config
 from prodml.predict import DurationPredictor
-from prodml.service import InferenceService
 
 logger = structlog.get_logger().bind(component="api")
 
 
 # ── Dependency factory (composition root) ────────────
-def get_inference_service() -> InferenceService:
-    """
-    Litestar calls this once at startup (use_cache=True below) and wires
-    the predictor + cache into one InferenceService for handlers to use.
-    """
+def get_predictor() -> DurationPredictor:
+    """Litestar calls this once at startup (use_cache=True below) and loads
+    the model artifact so every request reuses the same in-memory predictor."""
     logger.info("initializing_dependencies")
-
-    predictor = DurationPredictor().load(config.model_path)
-    cache = RedisCacheManager(host=config.redis_host, port=config.redis_port)
-
-    return InferenceService(predictor=predictor, cache=cache)
+    return DurationPredictor().load(config.model_path)
 
 
 # ── Handlers ──────────────────────────────────────────
 @post("/predict")
 async def predict(
     data: PredictRequest,
-    service: InferenceService,
+    predictor: DurationPredictor,
 ) -> PredictResponse:
     """Predict trip duration for a single trip."""
     logger.info("prediction_request_received")
 
     record = data.to_record()
-    result = service.get_prediction(record)
+    result = predictor.predict_one(record)
 
     logger.info("prediction_request_successful", result=result)
     return PredictResponse(prediction_minutes=result)
@@ -52,13 +44,13 @@ async def predict(
 @post("/predict/batch")
 async def predict_batch(
     data: PredictBatchRequest,
-    service: InferenceService,
+    predictor: DurationPredictor,
 ) -> PredictBatchResponse:
-    """Predict trip duration for a batch of trips (bypasses cache, direct to model)."""
+    """Predict trip duration for a batch of trips."""
     logger.info("batch_prediction_request_received", count=len(data.trips))
 
     records = data.to_records()
-    results = service.predictor.predict_batch(records)
+    results = predictor.predict_batch(records)
 
     logger.info("batch_prediction_request_successful", count=len(results))
     return PredictBatchResponse(predictions_minutes=results)
@@ -73,7 +65,7 @@ async def health() -> HealthResponse:
 app = Litestar(
     route_handlers=[predict, predict_batch, health],
     dependencies={
-        "service": Provide(get_inference_service, use_cache=True, sync_to_thread=False),
+        "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False),
     },
 )
 
