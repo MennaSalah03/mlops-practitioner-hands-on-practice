@@ -1,16 +1,19 @@
-""" Inference """
+"""Inference"""
 
 import hashlib
 import json
+
 import structlog
-import logging
-from src.cache import BaseCacheManager
-from src.model import BaseModelPredictor
+
+from src.prodml.cache import BaseCacheManager
+from src.prodml.predict import BaseModelPredictor
 
 logger = structlog.get_logger()
 
+
 class InferenceService:
-    """ Inference of MaseModelPredicitor class and the BaseCacheManager class """
+    """Inference of MaseModelPredicitor class and the BaseCacheManager class"""
+
     def __init__(self, predictor: BaseModelPredictor, cache: BaseCacheManager):
         # Composition: The service "has a" predictor and "has a" cache.
         self.predictor = predictor
@@ -23,7 +26,7 @@ class InferenceService:
         return hashlib.md5(feature_str.encode()).hexdigest()
 
     def get_prediction(self, features: list[float]) -> float:
-        """ get prediction """
+        """get prediction"""
         cache_key = self._generate_cache_key(features)
 
         # Ask the cache if it has the prediction already stored

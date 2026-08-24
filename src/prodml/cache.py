@@ -1,23 +1,28 @@
-""" Cache """
+"""Cache"""
 
 from abc import ABC, abstractmethod
-import structlog
+
 import redis
+import structlog
 
 logger = structlog.get_logger()
 
+
 class BaseCacheManager(ABC):
     """The strict contract for caching."""
+
     @abstractmethod
     def get(self, key: str) -> float | None:
-        """ Abstraction class for cache getter method """
+        """Abstraction class for cache getter method"""
 
     @abstractmethod
     def set(self, key: str, value: float, ttl: int = 3600) -> None:
-        """ Abstraction class for cache setter method """
+        """Abstraction class for cache setter method"""
+
 
 class RedisCacheManager(BaseCacheManager):
     """The concrete implementation for Redis."""
+
     def __init__(self, host: str, port: int = 6379):
         # Decode responses ensures we get strings back, not bytes
         self.logger = logger.bind(component="cache", redis_host=host, redis_port=port)

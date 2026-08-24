@@ -1,6 +1,9 @@
+"""logging configuration for structured logging"""
+
 import os
+
 import structlog
-import logging
+
 
 def configure_logging():
     """Sets the global rules for how structlog behaves."""
@@ -9,8 +12,8 @@ def configure_logging():
 
     # Common processors (things we want in EVERY log)
     shared_processors = [
-        structlog.processors.TimeStamper(fmt="iso"), # Adds a timestamp
-        structlog.stdlib.add_log_level,              # Adds INFO, DEBUG, etc.
+        structlog.processors.TimeStamper(fmt="iso"),  # Adds a timestamp
+        structlog.stdlib.add_log_level,  # Adds INFO, DEBUG, etc.
     ]
 
     # Environment-specific formatting
