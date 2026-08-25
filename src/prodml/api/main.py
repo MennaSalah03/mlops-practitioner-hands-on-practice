@@ -6,6 +6,7 @@ from litestar.di import Provide
 
 from prodml.api.schemas import (
     HealthResponse,
+    MetadataResponse,
     PredictBatchRequest,
     PredictBatchResponse,
     PredictRequest,
@@ -26,7 +27,7 @@ def get_predictor() -> DurationPredictor:
 
 
 # ── Handlers ──────────────────────────────────────────
-@post("/predict")
+@post("/predict", description="upload a single trip data to get duration prediction")
 async def predict(
     data: PredictRequest,
     predictor: DurationPredictor,
@@ -41,7 +42,7 @@ async def predict(
     return PredictResponse(prediction_minutes=result)
 
 
-@post("/predict/batch")
+@post("/predict/batch", description="upload batch trip data to get duration prediction")
 async def predict_batch(
     data: PredictBatchRequest,
     predictor: DurationPredictor,
@@ -61,9 +62,14 @@ async def health() -> HealthResponse:
     return HealthResponse()
 
 
+@get("/metadata")
+async def metadata() -> MetadataResponse:
+    return
+
+
 # ── App ───────────────────────────────────────────────
 app = Litestar(
-    route_handlers=[predict, predict_batch, health],
+    route_handlers=[predict, predict_batch, health, metadata],
     dependencies={
         "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False),
     },

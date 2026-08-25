@@ -1,14 +1,25 @@
 """Pydantic schemas — the web boundary. Translates HTTP JSON <-> domain dicts."""
 
-from pydantic import BaseModel
+from datetime import datetime
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field
 
 
 class PredictRequest(BaseModel):
     """Raw trip fields, as a caller (booking app, dispatcher, etc.) would know them."""
 
-    PULocationID: int
-    DOLocationID: int
-    trip_distance: float
+    PULocationID: int = Field(ge=1, le=265)
+    DOLocationID: int = Field(ge=1, le=265)
+    trip_distance: float = Field(gt=0, lt=200)
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"PULocationID": 43, "DOLocationID": 236, "trip_distance": 3.5}
+            ]
+        }
+    }
 
     def to_record(self) -> dict:
         """Bridge between the web schema and the feature-engineering input shape."""
@@ -25,14 +36,29 @@ class PredictBatchRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    prediction_minutes: float
+    prediction: float
+    model_version: str
+    correlation_id: uuid4
+    latency_ms: float
     status: str = "ok"
 
 
 class PredictBatchResponse(BaseModel):
-    predictions_minutes: list[float]
+    predictions: list[float]
+    model_version: str
+    correlation_id: UUID
+    latency_ms: float
     status: str = "ok"
 
 
 class HealthResponse(BaseModel):
     status: str = "healthy"
+    model_loaded: bool
+
+
+class MetadataResponse(BaseModel):
+    model_version: str
+    training_date: datetime
+    feature_names: list[str]
+    framework: str
+    artifact_hash: str
