@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # File paths with sane defaults
     data_path: str = "data/green_tripdata_2026-04.parquet"
-    model_path: str = "models/baseline.pkl"
+    model_path: str = "models/baseline.onnx"
     report_path: str = "reports/module-1.md"
 
     # Features & Hyperparameters

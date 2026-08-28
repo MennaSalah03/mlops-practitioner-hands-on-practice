@@ -62,6 +62,7 @@ async def health() -> HealthResponse:
     return HealthResponse()
 
 
+# TODO: Export the metadata after training and retreive that data here (JSON probably)
 @get("/metadata")
 async def metadata() -> MetadataResponse:
     return

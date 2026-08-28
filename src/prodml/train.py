@@ -1,16 +1,12 @@
 """Fit the model and persist it (bundled with its fitted DictVectorizer)."""
 
-import pickle
-from pathlib import Path
-
 import structlog
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from prodml.config import config
-from prodml.data import load_and_split_data
-from prodml.features import feature_engineering, to_feature_dicts
+from prodml.features import to_feature_dicts
 
 logger = structlog.get_logger()
 
@@ -38,24 +34,3 @@ def train_model(df_train, df_test) -> tuple[dict, dict]:
 
     artifact = {"dv": dv, "model": model}
     return artifact, {"rmse": rmse, "mae": mae}
-
-
-def persist_model(artifact: dict, model_path: str | None = None) -> None:
-    """saving the model as pickle file"""
-    path = Path(model_path or config.model_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as f_out:
-        pickle.dump(artifact, f_out)
-    logger.info("model is saved", path=str(path))
-
-
-def main() -> dict:
-    df_train_raw, df_test_raw = load_and_split_data()
-    df_train, df_test = feature_engineering(df_train_raw, df_test_raw)
-    artifact, metrics = train_model(df_train, df_test)
-    persist_model(artifact)
-    return metrics
-
-
-if __name__ == "__main__":
-    main()
