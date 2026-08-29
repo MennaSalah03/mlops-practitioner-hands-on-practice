@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import structlog
@@ -21,16 +22,17 @@ def persist_model(artifact: dict, model_path: str | None = None) -> None:
     """saving the model as an onnx file"""
     path = Path(model_path or config.model_path)
 
-    dv = artifact.get("dv")
-    model = artifact.get("model")
+    dv = artifact["dv"]
+    model = artifact["model"]
+    metadata = artifact["metadata"]
 
     pipeline = Pipeline(
         [
             ("vectorizer", dv),
             (
-                "classifier",
+                "regressor",
                 model,
-            ),  # Adjust name to 'regressor' if this is a regression model
+            ),
         ]
     )
 
@@ -39,19 +41,33 @@ def persist_model(artifact: dict, model_path: str | None = None) -> None:
     ]
     onnx_model = convert_sklearn(pipeline, initial_types=initial_type, target_opset=12)
 
+    for key, value in metadata.items():
+        entry = onnx_model.metadata_props.add()
+        entry.key = key
+        entry.value = json.dumps(value) if not isinstance(value, str) else value
+
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f_out:
         f_out.write(onnx_model.SerializeToString())
 
-    logger.info("model is saved", path=str(path))
+    with open(config.metadata_path, "w") as f_out:
+        json.dump(metadata, f_out, indent=2)
+
+    logger.info(
+        "model is saved",
+        path=str(path),
+        metadata_path=str(config.metadata_path),
+        artifact_hash=metadata["artifact_hash"],
+        model_version=metadata["model_version"],
+    )
 
 
-def main() -> dict:
+def main() -> None:
     df_train_raw, df_test_raw = load_and_split_data()
     df_train, df_test = feature_engineering(df_train_raw, df_test_raw)
-    artifact, metrics = train_model(df_train, df_test)
+    artifact = train_model(df_train, df_test)
     persist_model(artifact)
-    return metrics
+    # return metrics
 
 
 if __name__ == "__main__":
