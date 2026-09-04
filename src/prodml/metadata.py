@@ -56,7 +56,7 @@ def build_metadata(payload: dict, metrics: dict) -> ArtifactMetadata:
     return ArtifactMetadata(
         model_version=_git_sha(),
         training_date=datetime.now(UTC).isoformat(),
-        feature_names=config.categorical + config.numerical,
+        feature_names=config.raw_input_fields,
         framework=f"sklearn-{sklearn.__version__}",
         metrics=metrics,
         artifact_hash=_hash_payload(payload),

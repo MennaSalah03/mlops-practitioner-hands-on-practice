@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 
 def persist_model(artifact: dict, model_path: str | None = None) -> None:
     """saving the model as an onnx file"""
-    path = Path(model_path or config.model_path)
+    path = Path(model_path or config.onnx_model_path)
 
     dv = artifact["dv"]
     model = artifact["model"]

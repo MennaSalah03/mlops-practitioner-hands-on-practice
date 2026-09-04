@@ -25,11 +25,12 @@ class Settings(BaseSettings):
 
     # File paths with sane defaults
     data_path: str = "data/green_tripdata_2026-04.parquet"
-    model_path: str = "models/baseline.onnx"
+    onnx_model_path: str = "models/baseline.onnx"
     metadata_path: str = "models/.metadata.json"
     report_path: str = "reports/module-1.md"
 
     # Features & Hyperparameters
+    raw_input_fields: list[str] = ["PULocationID", "DOLocationID", "trip_distance"]
     categorical: list[str] = ["PU_DO"]
     numerical: list[str] = ["trip_distance"]
     target: str = "duration"

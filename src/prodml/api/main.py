@@ -1,8 +1,14 @@
 """Litestar API for the DurationPredictor model."""
 
+import json
+from pathlib import Path
+
 import structlog
+from anyio import to_thread
 from litestar import Litestar, get, post
 from litestar.di import Provide
+from litestar.exceptions import HTTPException
+from litestar.response import Redirect
 
 from prodml.api.schemas import (
     HealthResponse,
@@ -23,7 +29,7 @@ def get_predictor() -> DurationPredictor:
     """Litestar calls this once at startup (use_cache=True below) and loads
     the model artifact so every request reuses the same in-memory predictor."""
     logger.info("initializing_dependencies")
-    return DurationPredictor().load(config.model_path)
+    return DurationPredictor().load(config.onnx_model_pathodel)
 
 
 # ── Handlers ──────────────────────────────────────────
@@ -57,20 +63,40 @@ async def predict_batch(
     return PredictBatchResponse(predictions_minutes=results)
 
 
+@get("/")
+async def root() -> Redirect:
+    return Redirect(path="/health")
+
+
 @get("/health")
 async def health() -> HealthResponse:
     return HealthResponse()
 
 
-# TODO: Export the metadata after training and retreive that data here (JSON probably)
 @get("/metadata")
 async def metadata() -> MetadataResponse:
-    return
+    path = Path(config.metadata_path)
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Model metadata not found - model may not exist",
+        )
+
+    data = await to_thread.run_sync(_read_metadata_sync, path)
+
+    return MetadataResponse(**data)
+
+
+def _read_metadata_sync(path: Path) -> dict:
+    """The actual blocking I/O for getting metadata from JSON file"""
+    with open(path) as f_in:
+        return json.load(f_in)
 
 
 # ── App ───────────────────────────────────────────────
 app = Litestar(
-    route_handlers=[predict, predict_batch, health, metadata],
+    route_handlers=[root, predict, predict_batch, health, metadata],
     dependencies={
         "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False),
     },

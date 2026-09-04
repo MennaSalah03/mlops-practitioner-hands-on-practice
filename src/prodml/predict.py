@@ -32,7 +32,7 @@ class DurationPredictor(BaseModelPredictor):
         self.logger = logger.bind(component="DurationPredictor")
 
     def load(self, model_path: str | None = None) -> "DurationPredictor":
-        path = model_path or config.model_path
+        path = model_path or config.onnx_model_path
         self.logger.info("loading_model_started", path=path)
         with open(path, "rb") as f_in:
             artifact = pickle.load(f_in)

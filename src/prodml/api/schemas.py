@@ -11,7 +11,7 @@ class PredictRequest(BaseModel):
 
     PULocationID: int = Field(ge=1, le=265)
     DOLocationID: int = Field(ge=1, le=265)
-    trip_distance: float = Field(gt=0, lt=200)
+    trip_distance: float = Field(gt=0, lt=60)
 
     model_config = {
         "json_schema_extra": {
@@ -61,4 +61,5 @@ class MetadataResponse(BaseModel):
     training_date: datetime
     feature_names: list[str]
     framework: str
+    metrics: dict
     artifact_hash: str
