@@ -27,9 +27,15 @@ logger = structlog.get_logger().bind(component="api")
 # ── Dependency factory (composition root) ────────────
 def get_predictor() -> DurationPredictor:
     """Litestar calls this once at startup (use_cache=True below) and loads
-    the model artifact so every request reuses the same in-memory predictor."""
+    the model artifact so every request reuses the same in-memory predictor.
+
+    No path passed here — DurationPredictor.load()'s own default
+    (config.pickle_model_path) is the single source of truth for which file
+    this predictor needs, so it can't drift out of sync between api and
+    predict.py.
+    """
     logger.info("initializing_dependencies")
-    return DurationPredictor().load(config.onnx_model_pathodel)
+    return DurationPredictor().load()
 
 
 # ── Handlers ──────────────────────────────────────────
@@ -69,8 +75,16 @@ async def root() -> Redirect:
 
 
 @get("/health")
-async def health() -> HealthResponse:
-    return HealthResponse()
+async def health(predictor: DurationPredictor) -> HealthResponse:
+    # Dynamically verifies the model loaded successfully during startup
+    is_loaded = predictor._session is not None and predictor._dv is not None
+    return HealthResponse(model_loaded=is_loaded)
+
+
+def _read_metadata_sync(path: Path) -> dict:
+    """The actual blocking I/O for getting metadata from JSON file."""
+    with open(path) as f_in:
+        return json.load(f_in)
 
 
 @get("/metadata")
@@ -88,18 +102,13 @@ async def metadata() -> MetadataResponse:
     return MetadataResponse(**data)
 
 
-def _read_metadata_sync(path: Path) -> dict:
-    """The actual blocking I/O for getting metadata from JSON file"""
-    with open(path) as f_in:
-        return json.load(f_in)
-
-
 # ── App ───────────────────────────────────────────────
 app = Litestar(
     route_handlers=[root, predict, predict_batch, health, metadata],
     dependencies={
         "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False),
     },
+    debug=True,
 )
 
 if __name__ == "__main__":

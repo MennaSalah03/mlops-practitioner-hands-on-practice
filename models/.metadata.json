@@ -1,0 +1,15 @@
+{
+  "model_version": "b119b88",
+  "training_date": "2026-09-05T18:31:40.324739+00:00",
+  "feature_names": [
+    "PULocationID",
+    "DOLocationID",
+    "trip_distance"
+  ],
+  "framework": "sklearn-1.9.0",
+  "metrics": {
+    "rmse": 6.784212260444635,
+    "mae": 4.4617953593057695
+  },
+  "artifact_hash": "6d895935c5e05e82eeda3c5a6727dfa5322f33afcb80b15ed2843d217d466096"
+}

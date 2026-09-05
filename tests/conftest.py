@@ -70,3 +70,40 @@ def mock_config(monkeypatch):
 
     monkeypatch.setattr("prodml.features.config", MockConfig)
     return MockConfig
+
+
+@pytest.fixture
+def fitted_artifact(sample_raw_dataframe):
+    """Trains a model on the dummy DataFrame to generate a real artifact in memory."""
+    from prodml.features import feature_engineering
+    from prodml.train import train_model
+
+    # We pass the sample dataframe as both train and test just to get a fitted model
+    df_train, df_test = feature_engineering(
+        sample_raw_dataframe, sample_raw_dataframe.copy()
+    )
+    artifact = train_model(df_train, df_test)
+    return artifact
+
+
+@pytest.fixture
+def exported_models(fitted_artifact, monkeypatch, tmp_path):
+    """Exports both ONNX and Pickle versions to a safe, disposable directory."""
+    from prodml.config import config
+    from prodml.export import persist_model_onnx, persist_model_pickle
+
+    # 1. Define paths inside Pytest's temporary folder (/tmp/pytest-of-mennasalah/...)
+    pickle_model_path = tmp_path / "baseline.pkl"
+    onnx_model_path = tmp_path / "baseline.onnx"
+    metadata_path = tmp_path / ".metadata.json"
+
+    # 2. Intercept the Pydantic config object and overwrite the paths
+    monkeypatch.setattr(config, "pickle_model_path", str(pickle_model_path))
+    monkeypatch.setattr(config, "onnx_model_path", str(onnx_model_path))
+    monkeypatch.setattr(config, "metadata_path", str(metadata_path))
+
+    # 3. Run the actual export functions (they will now write to tmp_path)
+    persist_model_onnx(fitted_artifact, str(onnx_model_path))
+    persist_model_pickle(fitted_artifact, str(pickle_model_path))
+
+    return {"onnx": str(onnx_model_path), "pkl": str(pickle_model_path)}

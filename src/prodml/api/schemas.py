@@ -15,9 +15,7 @@ class PredictRequest(BaseModel):
 
     model_config = {
         "json_schema_extra": {
-            "examples": [
-                {"PULocationID": 43, "DOLocationID": 236, "trip_distance": 3.5}
-            ]
+            "example": {"PULocationID": 43, "DOLocationID": 236, "trip_distance": 3.5}
         }
     }
 
@@ -36,24 +34,24 @@ class PredictBatchRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    prediction: float
-    model_version: str
-    correlation_id: uuid4
-    latency_ms: float
+    prediction_minutes: float
+    model_version: str = "unknown"
+    correlation_id: UUID = Field(default_factory=uuid4)
+    latency_ms: float = 0.0
     status: str = "ok"
 
 
 class PredictBatchResponse(BaseModel):
-    predictions: list[float]
-    model_version: str
-    correlation_id: UUID
-    latency_ms: float
+    predictions_minutes: list[float]
+    model_version: str = "unknown"
+    correlation_id: UUID = Field(default_factory=uuid4)
+    latency_ms: float = 0.0
     status: str = "ok"
 
 
 class HealthResponse(BaseModel):
     status: str = "healthy"
-    model_loaded: bool
+    model_loaded: bool = True
 
 
 class MetadataResponse(BaseModel):
