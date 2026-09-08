@@ -1,4 +1,4 @@
-from src.prodml.features import (
+from prodml.features import (
     add_pu_do_feature,
     compute_target,
     filter_outliers,
