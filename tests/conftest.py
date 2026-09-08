@@ -107,3 +107,61 @@ def exported_models(fitted_artifact, monkeypatch, tmp_path):
     persist_model_pickle(fitted_artifact, str(pickle_model_path))
 
     return {"onnx": str(onnx_model_path), "pkl": str(pickle_model_path)}
+
+
+# --------------------------------------------------------------------------- #
+# Added for predict.py / API tests
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def sample_inference_record() -> dict:
+    """A single raw request payload — what a client of /predict actually
+    sends, before prepare_inference_record() derives PU_DO from it."""
+    return {"PULocationID": 100, "DOLocationID": 10, "trip_distance": 5.0}
+
+
+@pytest.fixture
+def predictor(exported_models):
+    """A loaded, real DurationPredictor (onnxruntime + pickled dv), pointed
+    at exported_models' tmp files via the config patches that fixture already
+    applied. No args needed — DurationPredictor.load() reads
+    config.pickle_model_path / config.onnx_model_path, which exported_models
+    has already monkeypatched by the time this fixture runs."""
+    from prodml.predict import DurationPredictor
+
+    return DurationPredictor().load()
+
+
+@pytest.fixture
+def api_client(exported_models):
+    """A real Litestar TestClient wired to a fresh app instance per test.
+
+    Depends on exported_models (not just its return value) so config's paths
+    are already patched to tmp files before the app is built. A fresh app is
+    constructed per test — rather than importing the module-level `app` from
+    prodml.api.main — because Litestar's Provide(use_cache=True) caches the
+    loaded predictor for the lifetime of the app instance it's attached to;
+    reusing one shared `app` across tests would leak the first test's loaded
+    model into every test after it.
+
+    Exercises the real DurationPredictor (onnxruntime included) — nothing
+    about prediction is mocked, only the file paths it reads are redirected.
+    """
+    from litestar.di import Provide
+    from litestar.testing import create_test_client
+
+    from prodml.api.main import (
+        get_predictor,
+        health,
+        metadata,
+        predict,
+        predict_batch,
+        root,
+    )
+
+    with create_test_client(
+        route_handlers=[root, predict, predict_batch, health, metadata],
+        dependencies={
+            "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False)
+        },
+    ) as client:
+        yield client

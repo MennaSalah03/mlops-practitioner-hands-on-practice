@@ -6,7 +6,7 @@ from pathlib import Path
 import structlog
 from anyio import to_thread
 from litestar import Litestar, get, post
-from litestar.di import Provide
+from litestar.di import NamedDependency, Provide
 from litestar.exceptions import HTTPException
 from litestar.response import Redirect
 
@@ -19,20 +19,20 @@ from prodml.api.schemas import (
     PredictResponse,
 )
 from prodml.config import config
-from prodml.predict import DurationPredictor
+from prodml.predict import BaseModelPredictor, DurationPredictor
 
 logger = structlog.get_logger().bind(component="api")
 
 
 # ── Dependency factory (composition root) ────────────
-def get_predictor() -> DurationPredictor:
+def get_predictor() -> BaseModelPredictor:
     """Litestar calls this once at startup (use_cache=True below) and loads
     the model artifact so every request reuses the same in-memory predictor.
 
-    No path passed here — DurationPredictor.load()'s own default
-    (config.pickle_model_path) is the single source of truth for which file
-    this predictor needs, so it can't drift out of sync between api and
-    predict.py.
+    DurationPredictor.load() reads the vectorizer from
+    config.pickle_model_path and the regression graph from
+    config.onnx_model_path — no paths passed here, so those two config
+    values stay the single source of truth (see predict.py).
     """
     logger.info("initializing_dependencies")
     return DurationPredictor().load()
@@ -42,7 +42,7 @@ def get_predictor() -> DurationPredictor:
 @post("/predict", description="upload a single trip data to get duration prediction")
 async def predict(
     data: PredictRequest,
-    predictor: DurationPredictor,
+    predictor: NamedDependency[BaseModelPredictor],
 ) -> PredictResponse:
     """Predict trip duration for a single trip."""
     logger.info("prediction_request_received")
@@ -57,7 +57,7 @@ async def predict(
 @post("/predict/batch", description="upload batch trip data to get duration prediction")
 async def predict_batch(
     data: PredictBatchRequest,
-    predictor: DurationPredictor,
+    predictor: NamedDependency[BaseModelPredictor],
 ) -> PredictBatchResponse:
     """Predict trip duration for a batch of trips."""
     logger.info("batch_prediction_request_received", count=len(data.trips))
@@ -75,10 +75,8 @@ async def root() -> Redirect:
 
 
 @get("/health")
-async def health(predictor: DurationPredictor) -> HealthResponse:
-    # Dynamically verifies the model loaded successfully during startup
-    is_loaded = predictor._session is not None and predictor._dv is not None
-    return HealthResponse(model_loaded=is_loaded)
+async def health() -> HealthResponse:
+    return HealthResponse()
 
 
 def _read_metadata_sync(path: Path) -> dict:
@@ -108,7 +106,6 @@ app = Litestar(
     dependencies={
         "predictor": Provide(get_predictor, use_cache=True, sync_to_thread=False),
     },
-    debug=True,
 )
 
 if __name__ == "__main__":
