@@ -1,20 +1,22 @@
 [project]
-name = "mlops-course-mini-projects"
+name = "prodml"
 version = "0.0.0"
 description = "Add your description here"
-readme = "README.md"
 authors = [
     { name = "mennasalah", email = "menna.skh2003@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
     "litestar>=2.24.0",
+    "numpy",
     "onnxruntime>=1.29.0",
+    "pandas>=3.0.5",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
-    "pytest>=9.1.1",
     "redis>=8.1.0",
     "rich>=15.0.0",
+    "scikit-learn>=1.9.0",
+    "scipy>=1.18.0",
     "structlog>=26.1.0",
     "uvicorn>=0.52.4",
 ]
@@ -22,9 +24,6 @@ dependencies = [
 [tool.pytest.ini_options]
 addopts = "--cov=src/prodml --cov-fail-under=70"
 
-
-[project.scripts]
-mlops-course-mini-projects = "mlops_course_mini_projects:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
@@ -36,7 +35,7 @@ dev = [
     "pandas>=3.0.5",
     "pre-commit>=4.6.2",
     "pyarrow>=25.0.1",
+    "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "scikit-learn>=1.9.0",
     "skl2onnx>=1.20.0",
 ]
