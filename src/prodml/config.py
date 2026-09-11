@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     version: str = Field(default_factory=get_project_version)
 
+    mlflow_tracking_uri: str
+    postgres_user: str
+    postgres_password: str
+    postgres_db: str
+    minio_root_user: str
+    minio_root_password: str
+
 
 # the single truth imported by the rest of the app.
 config = Settings()

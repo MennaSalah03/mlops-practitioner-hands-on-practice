@@ -1,6 +1,6 @@
 [project]
 name = "prodml"
-version = "0.0.0"
+version = "0.1.0"
 description = "Add your description here"
 authors = [
     { name = "mennasalah", email = "menna.skh2003@gmail.com" }
@@ -8,6 +8,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "litestar>=2.24.0",
+    "mlflow>=3.16.0",
     "numpy",
     "onnxruntime>=1.29.0",
     "pandas>=3.0.5",
