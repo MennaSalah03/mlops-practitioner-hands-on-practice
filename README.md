@@ -13,7 +13,6 @@ docker run --rm -p 8000:8000 menna011/prodml-api:0.1.0
 
 ### Option 2: Build and Develop Locally
 
-To train the model, export the ONNX artifacts, and compile the container from scratch:
 
 ```
 # 1. Install dependencies (including dev tools)
