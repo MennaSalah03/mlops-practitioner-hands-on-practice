@@ -23,6 +23,10 @@ def get_project_version() -> str:
 class Settings(BaseSettings):
     """pydantic-settings configs"""
 
+    # read from a .env file if it exists
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    version: str = Field(default_factory=get_project_version)
+
     # File paths with sane defaults
     data_path: str = "data/green_tripdata_2026-04.parquet"
     pickle_model_path: str = "models/baseline.pkl"
@@ -42,14 +46,18 @@ class Settings(BaseSettings):
     min_duration: int = 1
     max_duration: int = 60
 
-    # read from a .env file if it exists
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    version: str = Field(default_factory=get_project_version)
+    api_host: str
+    api_port: int
+
+    # mlflow experiment
+    mlflow_experiment_name: str = "trip-duration-prediction"
 
     mlflow_tracking_uri: str
+    # postgres
     postgres_user: str
     postgres_password: str
     postgres_db: str
+    # minio storage
     minio_root_user: str
     minio_root_password: str
 
