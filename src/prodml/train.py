@@ -40,7 +40,8 @@ from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.inspection import permutation_importance
+
+# from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -231,7 +232,7 @@ def _common_log(
 
     n_features = len(feature_names)
     onnx_model = _to_onnx(model, model_type=model_name, n_features=n_features)
-    mlflow.onnx.log_model(onnx_model=onnx_model, artifact_path="model")
+    mlflow.onnx.log_model(onnx_model=onnx_model, name="model")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir_path = Path(tmp_dir)
@@ -402,14 +403,19 @@ def train_pytorch_mlp(
     params: dict | None = None,
     run_name: str | None = None,
 ) -> dict:
+
+    logger.info("========== STARTING PYTORCH MLP TRAINING ==========")
+    logger.info("Preparing train/test data...")
     dv, X_train, X_test, y_train, y_test = _prepare_xy(df_train, df_test)
     data_version = _data_version_hash(df_train, df_test)
     params = params or {
         "hidden_sizes": (64, 32),
         "learning_rate": 1e-3,
-        "epochs": 100,
-        "batch_size": 16,
+        "epochs": 5,
+        "batch_size": 64,
     }
+
+    logger.info("About to start MLflow run...")
 
     torch.manual_seed(config.random_state)
 
@@ -436,12 +442,24 @@ def train_pytorch_mlp(
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item() * len(idx)
+                logger.info(
+                    "Training epoch complete",
+                    epoch=epoch,
+                    epoch_loss=epoch_loss,
+                )
+            logger.info(
+                "Logging train_mse_loss to MLflow",
+                epoch=epoch,
+                value=epoch_loss,
+            )
             mlflow.log_metric("train_mse_loss", epoch_loss / n, step=epoch)
         train_seconds = time.perf_counter() - start
 
         model.eval()
         with torch.no_grad():
             y_pred = model(torch.as_tensor(X_test, dtype=torch.float32)).numpy()
+
+        logger.info("Calculating final test metrics...")
 
         rmse = mean_squared_error(y_test, y_pred) ** 0.5
         mae = mean_absolute_error(y_test, y_pred)
@@ -450,15 +468,18 @@ def train_pytorch_mlp(
             lambda buf: torch.save(model.state_dict(), buf)
         )
 
-        adapter = _TorchRegressorAdapter(model)
-        perm_result = permutation_importance(
-            adapter,
-            X_test,
-            y_test,
-            scoring="neg_mean_squared_error",
-            n_repeats=5,
-            random_state=config.random_state,
-        )
+        # adapter = _TorchRegressorAdapter(model)
+
+        # logger.info("Creating sklearn adapter...")
+
+        # perm_result = permutation_importance(
+        #     adapter,
+        #     X_test,
+        #     y_test,
+        #     scoring="neg_mean_squared_error",
+        #     n_repeats=5,
+        #     random_state=config.random_state,
+        # )
 
         _common_log(
             model=model,
@@ -474,7 +495,8 @@ def train_pytorch_mlp(
             y_test=y_test,
             y_pred=y_pred,
             feature_names=dv.get_feature_names_out().tolist(),
-            importances=perm_result.importances_mean,
+            importances=np.zeros(X_test.shape[1]),
+            # importances=perm_result.importances_mean,
         )
 
         logger.info("pytorch_mlp_trained", rmse=rmse, mae=mae, r2=r2)
