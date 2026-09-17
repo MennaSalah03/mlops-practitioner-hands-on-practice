@@ -3,6 +3,7 @@
 import pickle
 from abc import ABC, abstractmethod
 
+import mlflow
 import numpy as np
 import onnxruntime as ort
 import structlog
@@ -43,26 +44,83 @@ class DurationPredictor(BaseModelPredictor):
         self._input_name: str | None = None
         self.logger = logger.bind(component="DurationPredictor")
 
-    def load(
-        self, model_path: str | None = None, dv_path: str | None = None
-    ) -> "DurationPredictor":
-        dv_source = dv_path or config.pickle_model_path
-        self.logger.info("loading_vectorizer_started", path=dv_source)
-        with open(dv_source, "rb") as f_in:
-            artifact = pickle.load(f_in)
-        self._dv = artifact["dv"]
 
-        onnx_path = model_path or config.onnx_model_path
-        self.logger.info("loading_onnx_model_started", path=onnx_path)
-        self._session = ort.InferenceSession(
-            onnx_path, providers=["CPUExecutionProvider"]
+def load(
+    self,
+    model_uri: str | None = None,
+    dv_artifact_path: str = "dv.pkl",
+) -> "MLflowDurationPredictor":
+    model_uri = model_uri or config.mlflow_model_uri
+
+    self.logger.info(
+        "loading_onnx_model_started",
+        model_uri=model_uri,
+    )
+
+    try:
+        onnx_model = mlflow.onnx.load_model(model_uri)
+
+        self.logger.info(
+            "onnx_model_downloaded",
+            model_uri=model_uri,
         )
+
+        self._session = ort.InferenceSession(
+            onnx_model.SerializeToString(),
+            providers=["CPUExecutionProvider"],
+        )
+
         self._input_name = self._session.get_inputs()[0].name
 
         self.logger.info(
-            "loading_model_complete", dv_path=dv_source, onnx_path=onnx_path
+            "onnx_runtime_initialized",
+            input_name=self._input_name,
         )
-        return self
+
+    except Exception:
+        self.logger.exception(
+            "onnx_model_loading_failed",
+            model_uri=model_uri,
+        )
+        raise
+
+    try:
+        run_id = mlflow.models.get_model_info(model_uri).run_id
+
+        self.logger.info(
+            "loading_vectorizer_started",
+            run_id=run_id,
+            artifact_path=dv_artifact_path,
+        )
+
+        dv_local_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path=dv_artifact_path,
+        )
+
+        with open(dv_local_path, "rb") as f_in:
+            self._dv = pickle.load(f_in)
+
+        self.logger.info(
+            "vectorizer_loaded",
+            run_id=run_id,
+            path=dv_local_path,
+        )
+
+    except Exception:
+        self.logger.exception(
+            "vectorizer_loading_failed",
+            model_uri=model_uri,
+        )
+        raise
+
+    self.logger.info(
+        "loading_model_complete",
+        model_uri=model_uri,
+        run_id=run_id,
+    )
+
+    return self
 
     def _ensure_loaded(self) -> None:
         if self._dv is None or self._session is None:
@@ -91,3 +149,44 @@ class DurationPredictor(BaseModelPredictor):
         results = self._session.run(None, {self._input_name: X})[0].ravel().tolist()
         self.logger.debug("predict_batch", count=len(results))
         return results
+
+
+class MLflowDurationPredictor(DurationPredictor):
+    """Same predictor as DurationPredictor, but sources both artifacts from
+    the MLflow Model Registry instead of local paths.
+
+    The ONNX model is registered via mlflow.onnx.log_model, and the
+    DictVectorizer is a separate artifact (dv.pkl) logged in the same run —
+    NOT bundled into the model. So the pipeline is still explicitly:
+    raw dict -> dv.transform() -> dense float32 -> onnxruntime.
+    Only `load()` differs from DurationPredictor; predict_one/predict_batch
+    are inherited unchanged.
+    """
+
+    def load(
+        self,
+        model_uri: str | None = None,
+        dv_artifact_path: str = "dv.pkl",
+    ) -> "MLflowDurationPredictor":
+        # e.g. "models:/ride-duration-predictor/Production" or ".../3"
+        model_uri = model_uri or config.mlflow_model_uri
+
+        self.logger.info("loading_onnx_model_started", model_uri=model_uri)
+        onnx_model = mlflow.onnx.load_model(model_uri)
+        self._session = ort.InferenceSession(
+            onnx_model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        self._input_name = self._session.get_inputs()[0].name
+
+        run_id = mlflow.models.get_model_info(model_uri).run_id
+        self.logger.info(
+            "loading_vectorizer_started", run_id=run_id, artifact_path=dv_artifact_path
+        )
+        dv_local_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id, artifact_path=dv_artifact_path
+        )
+        with open(dv_local_path, "rb") as f_in:
+            self._dv = pickle.load(f_in)
+
+        self.logger.info("loading_model_complete", model_uri=model_uri, run_id=run_id)
+        return self

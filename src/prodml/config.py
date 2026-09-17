@@ -51,8 +51,8 @@ class Settings(BaseSettings):
 
     # mlflow experiment
     mlflow_experiment_name: str = "trip-duration-prediction"
-
     mlflow_tracking_uri: str
+    mlflow_model_uri: str = "models:/ride-duration-predictor/Production"
     # postgres
     postgres_user: str
     postgres_password: str

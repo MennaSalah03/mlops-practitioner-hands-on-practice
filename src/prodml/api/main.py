@@ -19,7 +19,10 @@ from prodml.api.schemas import (
     PredictResponse,
 )
 from prodml.config import config
-from prodml.predict import BaseModelPredictor, DurationPredictor
+from prodml.predict import (
+    BaseModelPredictor,
+    MLflowDurationPredictor,
+)
 
 logger = structlog.get_logger().bind(component="api")
 
@@ -34,8 +37,22 @@ def get_predictor() -> BaseModelPredictor:
     config.onnx_model_path — no paths passed here, so those two config
     values stay the single source of truth (see predict.py).
     """
-    logger.info("initializing_dependencies")
-    return DurationPredictor().load()
+    logger.info(
+        "initializing_dependencies",
+        model_uri=config.mlflow_model_uri,
+    )
+
+    try:
+        predictor = MLflowDurationPredictor().load(
+            model_uri=config.mlflow_model_uri,
+        )
+
+        logger.info("predictor_initialized")
+        return predictor
+
+    except Exception:
+        logger.exception("predictor_initialization_failed")
+        raise
 
 
 # ── Handlers ──────────────────────────────────────────
